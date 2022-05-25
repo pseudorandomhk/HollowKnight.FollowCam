@@ -35,7 +35,7 @@
         <ErrorReport>prompt</ErrorReport>
         <WarningLevel>4</WarningLevel>
         <!-- Path to DLL references required to build mod -->
-        <LocalRefs>References</LocalRefs>
+        <LocalRefs>$(MSBuildProgramFiles32)/Steam/steamapps/common/Hollow Knight/hollow_knight_Data/Managed</LocalRefs>
         <!-- The folder that exports will be generated in -->
         <ExportDir>Output</ExportDir>
     </PropertyGroup>
