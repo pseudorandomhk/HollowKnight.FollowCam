@@ -1,5 +1,4 @@
-﻿using Modding;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace FollowCam
@@ -20,16 +19,16 @@ namespace FollowCam
         {
             instance = this;
             cam = base.gameObject.AddComponent<Camera>();
-
+            
             float camProp = GlobalSettings.instance.camProportion;
             camRect = new Rect(1 - camProp, 1 - camProp, camProp, camProp);
             cam.rect = camRect;
             cam.backgroundColor = Color.black;
             cam.orthographic = true;
 
-            renderTexture = new(Screen.width, Screen.height, 0);
+            renderTexture = new RenderTexture(Screen.width, Screen.height, 0);
             float scaledWidth = Screen.width * camProp, scaledHeight = Screen.height * camProp;
-            textureRect = new(Screen.width - scaledWidth, 0, scaledWidth, scaledHeight);
+            textureRect = new Rect(Screen.width - scaledWidth, 0, scaledWidth, scaledHeight);
 
             Transform t = cam.transform;
             t.parent = base.transform.parent;
@@ -46,9 +45,34 @@ namespace FollowCam
             cam.cullingMask = mask;
 
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += AddSceneHitboxRenderers;
-            ModHooks.ColliderCreateHook += CreateRenderer;
+            On.PlayMakerUnity2DProxy.Start += (orig, self) =>
+            {
+                orig(self);
+                CreateRenderer(self.gameObject);
+            };
+
+            On.HeroController.Start += (orig, self) =>
+            {
+                orig(self);
+
+                int dummy = (followCamHitboxDispState + 2) % 3;
+                NextHitboxView(cam, ref dummy);
+                dummy = (mainCamHitboxDispState + 2) % 3;
+                NextHitboxView(GameCameras.instance.mainCamera, ref dummy);
+            };
+
+            On.InputHandler.Start += (orig, self) =>
+            {
+                orig(self);
+
+                CameraControls.instance.EnsureRegistered();
+            };
 
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += CheckCamEnabled;
+
+            Application.SetStackTraceLogType(LogType.Exception, StackTraceLogType.Full);
+            
+            CameraControls.instance.EnsureRegistered();
         }
 
         private void Update()

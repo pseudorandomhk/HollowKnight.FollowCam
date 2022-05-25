@@ -11,7 +11,7 @@ namespace FollowCam
         private static readonly Dictionary<HitboxType, Material> _materials = new();
         private static readonly float CIRCLE_THETA_SCALE = 0.01f;
         private static readonly string TAG = "FC::Hitbox";
-        
+
         private static float lineWidth = 0.1f;
 
         static AddLines()
@@ -31,7 +31,6 @@ namespace FollowCam
 
             HitboxType t = FindHitboxType(c2d);
             GameObject go = new GameObject(TAG);
-            go.tag = TAG;
             go.layer = t == HitboxType.Other ? FollowCam.HITBOX_MISC_LAYER : FollowCam.HITBOX_REG_LAYER;
             go.transform.parent = c2d.transform;
             var renderer = InitLineRenderer(go, t);
@@ -51,18 +50,18 @@ namespace FollowCam
                     new Vector3(half.x, -half.y) + offset,
                     -(Vector3)half + offset
                 };
-                renderer.positionCount = 4;
+                renderer.SetVertexCount(4);
                 renderer.SetPositions(points);
             }
             else if (c2d is EdgeCollider2D ec2d)
             {
-                renderer.positionCount = ec2d.pointCount;
+                renderer.SetVertexCount(ec2d.pointCount);
                 renderer.SetPositions(ec2d.points.Select(p => (Vector3)p).ToArray());
             }
             else if (c2d is CircleCollider2D cc2d)
             {
                 int npoints = (int)(1 / CIRCLE_THETA_SCALE);
-                renderer.positionCount = npoints;
+                renderer.SetVertexCount(npoints);
                 Vector3[] points = new Vector3[npoints];
                 float theta = 0, r = cc2d.radius;
                 for (int i = 0; i < npoints; i++)
@@ -88,7 +87,7 @@ namespace FollowCam
                     }
 
                     Vector3[] points = pc2d.GetPath(i).Select(p => (Vector3)p).ToArray();
-                    renderers[i].positionCount = points.Length;
+                    renderers[i].SetVertexCount(points.Length);
                     renderers[i].SetPositions(points);
                 }
             }
@@ -107,12 +106,11 @@ namespace FollowCam
             transform.localPosition = Vector3.zero;
 
             renderer.sharedMaterial = _materials[t];
-            renderer.startColor = renderer.endColor = t.GetColor();
-            renderer.loop = true;
-            renderer.startWidth = renderer.endWidth = lineWidth;
+            renderer.SetColors(t.GetColor(), t.GetColor());
+            renderer.SetWidth(lineWidth, lineWidth);
             renderer.sortingOrder = 100;
             renderer.useWorldSpace = false;
-            renderer.sortingLayerID = SortingLayer.NameToID("Over");
+            // renderer.sortingLayerID = SortingLayer.NameToID("Over");
 
             return renderer;
         }
@@ -123,25 +121,21 @@ namespace FollowCam
             if (HeroController.instance != null)
                 knight = HeroController.instance.gameObject;
 
-            if (c.GetComponent<DamageHero>() || go.LocateMyFSM("damages_hero"))
+            if (go.LocateMyFSM("damages_hero"))
                 return HitboxType.Enemy;
-            if (go.GetComponent<HealthManager>() || go.LocateMyFSM("health_manager_enemy") ||
-                go.LocateMyFSM("health_manager"))
-                return HitboxType.Other;
             if (go.layer == (int)PhysLayers.TERRAIN)
-                return go.name.Contains("Breakable") || go.name.Contains("Collapse") || go.GetComponent<Breakable>()
+                return go.name.Contains("Breakable") || go.name.Contains("Collapse")
                     ? HitboxType.Breakable
                     : HitboxType.Terrain;
             if (knight != null && go == knight && !c.isTrigger)
                 return HitboxType.Knight;
-            if (go.GetComponent<DamageEnemies>() || go.name == "Damager" || go.LocateMyFSM("damages_enemy") ||
-                go.LocateMyFSM("Damage"))
+            if (go.name == "Damager" || go.LocateMyFSM("damages_enemy") || go.LocateMyFSM("Damage"))
                 return HitboxType.Attack;
             if (c.isTrigger && c.GetComponent<HazardRespawnTrigger>())
                 return HitboxType.HazardRespawn;
             if (c.isTrigger && c.GetComponent<TransitionPoint>())
                 return HitboxType.Gate;
-            return c.GetComponent<Breakable>() ? HitboxType.Trigger : HitboxType.Other;
+            return HitboxType.Other;
         }
     }
 

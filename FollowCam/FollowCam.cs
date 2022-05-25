@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using InControl;
@@ -8,24 +9,46 @@ using UObject = UnityEngine.Object;
 
 namespace FollowCam
 {
-    internal class FollowCam : Mod, ICustomMenuMod, IGlobalSettings<GlobalSettings>
+    internal class FollowCam : Mod
     {
         public static readonly int HITBOX_REG_LAYER = 6, HITBOX_MISC_LAYER = 7;
+        private static string globalSettingsSuffix = "FollowCam.GlobalSettings.json";
 
         internal static FollowCam Instance { get; private set; }
         private GameObject followCamParent;
 
-        public FollowCam() : base("FollowCam") { }
+        public FollowCam() : base("FollowCam") => Initialize();
 
-        public override string GetVersion() => Assembly.GetExecutingAssembly().GetName().Version.ToString();
+        public override string Version => Assembly.GetExecutingAssembly().GetName().Version.ToString();
         public bool ToggleButtonInsideMenu => true;
 
-        public override void Initialize()
+        public void Initialize()
         {
             Log("Initializing");
-
             Instance = this;
-            followCamParent = new GameObject();
+
+            string globalSettingsPath = Path.Combine(Application.persistentDataPath, globalSettingsSuffix);
+            if (!File.Exists(globalSettingsPath))
+            {
+                Log("Global settings don't exist");
+                OnLoadGlobal(null);
+            }
+            else
+            {
+                var reader = new StreamReader(File.OpenRead(globalSettingsPath));
+                string json = reader.ReadToEnd();
+
+                try
+                {
+                    OnLoadGlobal(JsonUtility.FromJson<GlobalSettings>(json));
+                }
+                catch (Exception e)
+                {
+                    Log("[ERROR] Could not load global settings: " + e);
+                }
+            }
+
+            followCamParent = new GameObject("FC::FollowCamParent");
             UObject.DontDestroyOnLoad(followCamParent);
 
             // Instead of ModHooks.FinishedModLoading, for compatability with 1.5.75
@@ -48,20 +71,17 @@ namespace FollowCam
 
         public static bool TryAddKeybind(PlayerAction action, string bind)
         {
-            Mouse mouse = Mouse.None;
-            if (!Enum.TryParse(bind, out Key key) && !Enum.TryParse<Mouse>(bind, out mouse))
+            bool key = Enum.IsDefined(typeof(Key), bind);
+            if (!key && !Enum.IsDefined(typeof(Mouse), bind))
                 return false;
 
-            if (mouse != Mouse.None)
-                action.AddBinding(new MouseBindingSource(mouse));
+            if (!key)
+                action.AddBinding(new MouseBindingSource((Mouse) Enum.Parse(typeof(Mouse), bind)));
             else
-                action.AddBinding(new KeyBindingSource(key));
+                action.AddBinding(new KeyBindingSource((Key) Enum.Parse(typeof(Key), bind)));
 
             return true;
         }
-
-        public MenuScreen GetMenuScreen(MenuScreen modlist, ModToggleDelegates? toggleDelegates) =>
-            MenuHelper.GetMenuScreen(modlist, toggleDelegates!);
 
         public void OnLoadGlobal(GlobalSettings gs)
         {
@@ -69,7 +89,7 @@ namespace FollowCam
 
             if (GlobalSettings.instance.camProportion is < 0 or > 1)
             {
-                LogWarn("Camera proportion setting must be between 0 and 1");
+                Log("Camera proportion setting must be between 0 and 1");
                 GlobalSettings.instance.camProportion = 0.25f;
             }
 
